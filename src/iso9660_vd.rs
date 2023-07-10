@@ -9,10 +9,9 @@ use nom::{
     sequence::tuple,
     IResult,
 };
+use nom_derive::{Nom, Parse};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use strum::{EnumIs, EnumString};
-
-use crate::util::Parse;
 
 /// Header of a Volume Descriptor. Version is always 1.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,7 +20,7 @@ pub struct VDHeader {
     pub identifier: VDIdentifier,
 }
 
-#[derive(TryFromPrimitive, IntoPrimitive, Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Nom, TryFromPrimitive, IntoPrimitive, Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum VDType {
     Boot = 0,
@@ -58,7 +57,7 @@ pub enum VDIdentifier {
     TEA01,
 }
 
-impl Parse for VDHeader {
+impl Parse<&[u8]> for VDHeader {
     fn parse(input: &[u8]) -> IResult<&[u8], Self> {
         let (rest, (vd_type, identifier, _)) =
             tuple((VDType::parse, VDIdentifier::parse, tag(b"\x01")))(input)?;
@@ -73,7 +72,7 @@ impl Parse for VDHeader {
     }
 }
 
-impl Parse for VDIdentifier {
+impl Parse<&[u8]> for VDIdentifier {
     fn parse(input: &[u8]) -> IResult<&[u8], Self> {
         map_res(take(5usize), |d| Self::try_from(d))(input)
     }
@@ -96,7 +95,7 @@ mod tests {
 
     use rstest::rstest;
 
-    use crate::{iso9660_vd::*, util::Parse};
+    use crate::iso9660_vd::*;
 
     const MSINSTALL_SECTOR16_26: &[u8] =
         include_bytes!("../resources/sector16/msinstall-16-26.dat");
