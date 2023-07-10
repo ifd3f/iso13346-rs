@@ -92,22 +92,61 @@ impl TryFrom<&[u8]> for VDIdentifier {
 
 #[cfg(test)]
 mod tests {
-    use std::{fs::File, os::unix::prelude::FileExt};
+    use pretty_assertions::assert_eq;
 
-    use crate::{util::Parse, iso9660_vd::VDHeader};
+    use rstest::rstest;
 
-    #[test]
-    fn test() {
-        let f = File::open("/home/astrid/Downloads/Win10_21H2_English_x64.iso").unwrap();
-        let mut sector = vec![0u8; 2048];
+    use crate::{iso9660_vd::*, util::Parse};
 
-        for i in 0..10 {
-            f.read_at(&mut sector, 32768 + 2048 * i).unwrap();
-            let vd = VDHeader::parse(&sector);
-            match vd {
-                Ok((_, h)) => println!("{h:x?}"),
-                Err(_) => println!("Error"),
-            }
+    const MSINSTALL_SECTOR16_26: &[u8] =
+        include_bytes!("../resources/sector16/msinstall-16-26.dat");
+
+    #[rstest]
+    #[case(
+        &MSINSTALL_SECTOR16_26[0..2048] ,
+        VDHeader {
+            vd_type: VDType::Primary,
+            identifier: VDIdentifier::CD001
         }
+    )]
+    #[case(
+        &MSINSTALL_SECTOR16_26[2048..2048*2],
+        VDHeader {
+            vd_type: VDType::Boot,
+            identifier: VDIdentifier::CD001
+        }
+    )]
+    #[case(
+        &MSINSTALL_SECTOR16_26[2048*2..2048*3],
+        VDHeader {
+            vd_type: VDType::Terminator,
+            identifier: VDIdentifier::CD001
+        }
+    )]
+    #[case(
+        &MSINSTALL_SECTOR16_26[2048*3..2048*4] ,
+        VDHeader {
+            vd_type: VDType::Boot,
+            identifier: VDIdentifier::BEA01
+        }
+    )]
+    #[case(
+        &MSINSTALL_SECTOR16_26[2048*4..2048*5] ,
+        VDHeader {
+            vd_type: VDType::Boot,
+            identifier: VDIdentifier::NSR02
+        }
+    )]
+    #[case(
+        &MSINSTALL_SECTOR16_26[2048*5..2048*6] ,
+        VDHeader {
+            vd_type: VDType::Boot,
+            identifier: VDIdentifier::TEA01,
+        }
+    )]
+    fn parse_valid_vdheader(#[case] input: &[u8], #[case] expected: VDHeader) {
+        let (rest, vdh) = VDHeader::parse(input).expect("Failed to parse");
+        assert_eq!(vdh, expected);
+        assert_eq!(rest.len(), 2041);
     }
 }
